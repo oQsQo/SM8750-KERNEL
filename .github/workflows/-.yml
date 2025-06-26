@@ -1,0 +1,178 @@
+name: '-'
+on:
+  workflow_dispatch:
+    inputs:
+      KERNEL_NAME:
+        description: '内核名称'
+        required: true
+        default: '6.6.30-android15-8-g013ec21bba94-abogki383916444-4k'
+      KERNEL_TIME:
+        description: "构建日期"
+        required: true
+        default: 'Tue Dec 17 23:36:49 UTC 2024'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      CCACHE_COMPILERCHECK: "%compiler% -dumpmachine; %compiler% -dumpversion"
+      CCACHE_NOHASHDIR: "true"
+      CCACHE_HARDLINK: "true"
+      CCACHE_DIR: /home/runner/.ccache  
+      CCACHE_MAXSIZE: 8G
+    steps:
+      - name: 安装环境
+        run: |
+          sudo apt update
+          sudo apt install -y python3 git curl ccache libelf-dev
+          sudo curl https://storage.googleapis.com/git-repo-downloads/repo > /usr/local/bin/repo
+          sudo chmod a+x /usr/local/bin/repo
+
+      - name: 加载缓存
+        uses: actions/cache@v4
+        with:
+          path: ${{env.CCACHE_DIR}}
+          key: ccache-${{runner.os}}-${{github.ref}}
+          restore-keys: ccache-${{runner.os}}-     
+
+      - name: 下载源码
+        run: |
+          repo init -u https://github.com/OnePlusOSS/kernel_manifest.git -b refs/heads/oneplus/sm8750 -m oneplus_ace5_pro.xml --depth=1
+          repo --trace sync -c -j$(nproc) --no-tags
+          rm kernel_platform/common/android/abi_gki_protected_exports_* || echo "No protected exports!"
+          rm kernel_platform/msm-kernel/android/abi_gki_protected_exports_* || echo "No protected exports!"
+
+      - name: 修复HMBird
+        run: |
+          cd kernel_platform/common/drivers
+          cat << 'EOF' > _hmbird_.c
+            #include <linux/init.h>
+            #include <linux/module.h>
+            #include <linux/of.h>
+            #include <linux/slab.h>
+            #include <linux/string.h>
+
+            static int __init _hmbird_(void) {
+              struct device_node *ver_np;
+              const char *type;
+              int ret;
+
+              ver_np = of_find_node_by_path("/soc/oplus,hmbird/version_type");
+              if (!ver_np) {
+                    pr_info("_hmbird_: version_type node not found\n");
+                    return 0;
+              }
+
+              ret = of_property_read_string(ver_np, "type", &type);
+              if (ret) {
+                    pr_info("_hmbird_: type property not found\n");
+                    of_node_put(ver_np);
+                    return 0;
+              }
+
+              if (strcmp(type, "HMBIRD_OGKI")) {
+                    of_node_put(ver_np);
+                    return 0;
+              }
+
+              struct property *prop = of_find_property(ver_np, "type", NULL);
+              if (prop) {
+                struct property *new_prop = kmalloc(sizeof(*prop), GFP_KERNEL);
+                if (!new_prop) {
+                  pr_info("_hmbird_: kmalloc for new_prop failed\n");
+                  of_node_put(ver_np);
+                  return 0;
+                }
+                memcpy(new_prop, prop, sizeof(*prop));
+                new_prop->value = kmalloc(strlen("HMBIRD_GKI") + 1, GFP_KERNEL);
+                if (!new_prop->value) {
+                  pr_info("_hmbird_: kmalloc for new_prop->value failed\n");
+                  kfree(new_prop);
+                  of_node_put(ver_np);
+                  return 0;
+                }
+                strcpy(new_prop->value, "HMBIRD_GKI");
+                new_prop->length = strlen("HMBIRD_GKI") + 1;
+
+                if (of_remove_property(ver_np, prop) != 0) {
+                    pr_info("_hmbird_: of_remove_property failed\n");
+                    return 0;
+                }
+                if (of_add_property(ver_np, new_prop) !=0) {
+                    pr_info("_hmbird_: of_add_property failed\n");
+                    return 0;
+                }
+                pr_info("_hmbird_: success from HMBIRD_OGKI to HMBIRD_GKI\n");
+              } else {
+                pr_info("_hmbird_: type property structure not found\n");
+              }
+              of_node_put(ver_np);
+              return 0;
+            }
+            early_initcall(_hmbird_);
+            MODULE_LICENSE("GPL");
+          EOF
+          echo "obj-y += _hmbird_.o" >> Makefile
+
+      - name: 修复SCX
+        run: |
+          git clone https://github.com/HanKuCha/sched_ext.git
+          cp -r sched_ext/* kernel_platform/common/kernel/sched
+
+      - name: KSU & SUSFS
+        run: |
+          git clone https://github.com/SukiSU-Ultra/SukiSU_patch.git
+          git clone https://gitlab.com/simonpunk/susfs4ksu.git -b gki-android15-6.6
+
+          cd kernel_platform/common
+
+          cp ../../SukiSU_patch/hooks/syscall_hooks.patch .
+          patch -p1 -F 3 < syscall_hooks.patch || true
+
+          cp ../../susfs4ksu/kernel_patches/fs/* fs/
+          cp ../../susfs4ksu/kernel_patches/include/linux/* include/linux/
+          cp ../../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch .
+          sed -i 's/-32,12 +32,38/-32,11 +32,37/g' 50_add_susfs_in_gki-android15-6.6.patch
+          sed -i '/#include <trace\/hooks\/fs.h>/d' 50_add_susfs_in_gki-android15-6.6.patch
+          patch -p1 < 50_add_susfs_in_gki-android15-6.6.patch || true
+
+      - name: SukiSU-Ultra
+        run: |
+          cd kernel_platform
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/susfs-1.5.8/kernel/setup.sh" | bash -s susfs-1.5.8
+
+      - name: 编译选项
+        run: |
+          cd kernel_platform/common
+          echo "CONFIG_KSU=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=n" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_BIND_MOUNT=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_KSTAT=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_OVERLAYFS=n" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_TRY_UMOUNT=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_AUTO_ADD_TRY_UMOUNT_FOR_BIND_MOUNT=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_UNAME=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_ENABLE_LOG=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SPOOF_CMDLINE_OR_BOOTCONFIG=y" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_OPEN_REDIRECT=y" >> arch/arm64/configs/gki_defconfig
+
+      - name: 编译内核
+        run: |
+          cd kernel_platform/common
+          printf "echo ${{github.event.inputs.KERNEL_NAME}}" > scripts/setlocalversion
+          export KBUILD_BUILD_TIMESTAMP="${{github.event.inputs.KERNEL_TIME}}"
+          export PATH="/usr/lib/ccache:`realpath ../prebuilts/clang/host/linux-x86/clang-r510928/bin`:$PATH"
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- LLVM=1 RUSTC=../../prebuilts/rust/linux-x86/1.73.0b/bin/rustc PAHOLE=../../prebuilts/kernel-build-tools/linux-x86/bin/pahole O=o -j$(nproc) gki_defconfig all
+
+      - name: 输出文件
+        uses: actions/upload-artifact@v4
+        with:
+          name: Image
+          path: kernel_platform/common/o/arch/arm64/boot/Image
