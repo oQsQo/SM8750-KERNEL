@@ -46,71 +46,71 @@ jobs:
         run: |
           cd kernel_platform/common/drivers
           cat << 'EOF' > _hmbird_.c
-            #include <linux/init.h>
-            #include <linux/module.h>
-            #include <linux/of.h>
-            #include <linux/slab.h>
-            #include <linux/string.h>
+          #include <linux/init.h>
+          #include <linux/module.h>
+          #include <linux/of.h>
+          #include <linux/slab.h>
+          #include <linux/string.h>
 
-            static int __init _hmbird_(void) {
-              struct device_node *ver_np;
-              const char *type;
-              int ret;
+          static int __init _hmbird_(void) {
+            struct device_node *ver_np;
+            const char *type;
+            int ret;
 
-              ver_np = of_find_node_by_path("/soc/oplus,hmbird/version_type");
-              if (!ver_np) {
-                    pr_info("_hmbird_: version_type node not found\n");
-                    return 0;
-              }
-
-              ret = of_property_read_string(ver_np, "type", &type);
-              if (ret) {
-                    pr_info("_hmbird_: type property not found\n");
-                    of_node_put(ver_np);
-                    return 0;
-              }
-
-              if (strcmp(type, "HMBIRD_OGKI")) {
-                    of_node_put(ver_np);
-                    return 0;
-              }
-
-              struct property *prop = of_find_property(ver_np, "type", NULL);
-              if (prop) {
-                struct property *new_prop = kmalloc(sizeof(*prop), GFP_KERNEL);
-                if (!new_prop) {
-                  pr_info("_hmbird_: kmalloc for new_prop failed\n");
-                  of_node_put(ver_np);
+            ver_np = of_find_node_by_path("/soc/oplus,hmbird/version_type");
+            if (!ver_np) {
+                  pr_info("_hmbird_: version_type node not found\n");
                   return 0;
-                }
-                memcpy(new_prop, prop, sizeof(*prop));
-                new_prop->value = kmalloc(strlen("HMBIRD_GKI") + 1, GFP_KERNEL);
-                if (!new_prop->value) {
-                  pr_info("_hmbird_: kmalloc for new_prop->value failed\n");
-                  kfree(new_prop);
-                  of_node_put(ver_np);
-                  return 0;
-                }
-                strcpy(new_prop->value, "HMBIRD_GKI");
-                new_prop->length = strlen("HMBIRD_GKI") + 1;
-
-                if (of_remove_property(ver_np, prop) != 0) {
-                    pr_info("_hmbird_: of_remove_property failed\n");
-                    return 0;
-                }
-                if (of_add_property(ver_np, new_prop) !=0) {
-                    pr_info("_hmbird_: of_add_property failed\n");
-                    return 0;
-                }
-                pr_info("_hmbird_: success from HMBIRD_OGKI to HMBIRD_GKI\n");
-              } else {
-                pr_info("_hmbird_: type property structure not found\n");
-              }
-              of_node_put(ver_np);
-              return 0;
             }
-            early_initcall(_hmbird_);
-            MODULE_LICENSE("GPL");
+
+            ret = of_property_read_string(ver_np, "type", &type);
+            if (ret) {
+                  pr_info("_hmbird_: type property not found\n");
+                  of_node_put(ver_np);
+                  return 0;
+            }
+
+            if (strcmp(type, "HMBIRD_OGKI")) {
+                  of_node_put(ver_np);
+                  return 0;
+            }
+
+            struct property *prop = of_find_property(ver_np, "type", NULL);
+            if (prop) {
+              struct property *new_prop = kmalloc(sizeof(*prop), GFP_KERNEL);
+              if (!new_prop) {
+                pr_info("_hmbird_: kmalloc for new_prop failed\n");
+                of_node_put(ver_np);
+                return 0;
+              }
+              memcpy(new_prop, prop, sizeof(*prop));
+              new_prop->value = kmalloc(strlen("HMBIRD_GKI") + 1, GFP_KERNEL);
+              if (!new_prop->value) {
+                pr_info("_hmbird_: kmalloc for new_prop->value failed\n");
+                kfree(new_prop);
+                of_node_put(ver_np);
+                return 0;
+              }
+              strcpy(new_prop->value, "HMBIRD_GKI");
+              new_prop->length = strlen("HMBIRD_GKI") + 1;
+
+              if (of_remove_property(ver_np, prop) != 0) {
+                  pr_info("_hmbird_: of_remove_property failed\n");
+                  return 0;
+              }
+              if (of_add_property(ver_np, new_prop) !=0) {
+                  pr_info("_hmbird_: of_add_property failed\n");
+                  return 0;
+              }
+              pr_info("_hmbird_: success from HMBIRD_OGKI to HMBIRD_GKI\n");
+            } else {
+              pr_info("_hmbird_: type property structure not found\n");
+            }
+            of_node_put(ver_np);
+            return 0;
+          }
+          early_initcall(_hmbird_);
+          MODULE_LICENSE("GPL");
           EOF
           echo "obj-y += _hmbird_.o" >> Makefile
 
@@ -140,6 +140,147 @@ jobs:
         run: |
           cd kernel_platform
           curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/susfs-1.5.8/kernel/setup.sh" | bash -s susfs-1.5.8
+
+      - name: 绕过inotify&mincore检测
+        run: |
+          cd kernel_platform/common
+          patch -p1 <<'EOF'
+          diff --git a/fs/notify/fsnotify.c b/fs/notify/fsnotify.c
+          index 7974e91ffe13..0e4e86fca55d 100644
+          --- a/fs/notify/fsnotify.c
+          +++ b/fs/notify/fsnotify.c
+          @@ -14,6 +14,8 @@
+           #include <linux/fsnotify_backend.h>
+           #include "fsnotify.h"
+           
+          +#include <custom.h>
+          +
+           /*
+            * Clear all of the marks on an inode when it is being evicted from core
+            */
+          @@ -481,6 +483,11 @@ static void fsnotify_iter_next(struct fsnotify_iter_info *iter_info)
+           int fsnotify(__u32 mask, const void *data, int data_type, struct inode *dir,
+           	     const struct qstr *file_name, struct inode *inode, u32 cookie)
+           {
+          +
+          +	if (filter()) {
+          +		return 0;
+          +	}
+          +
+           	const struct path *path = fsnotify_data_path(data, data_type);
+           	struct super_block *sb = fsnotify_data_sb(data, data_type);
+           	struct fsnotify_iter_info iter_info = {};
+          diff --git a/include/custom.h b/include/custom.h
+          new file mode 100644
+          index 000000000000..3a536677a76a
+          --- /dev/null
+          +++ b/include/custom.h
+          @@ -0,0 +1,55 @@
+          +#ifndef _CUSTOM_H
+          +#define _CUSTOM_H
+          +
+          +#include <linux/mm.h>
+          +
+          +static int __attribute__((__unused__)) filter(void) {
+          +	struct mm_struct *mm = current->mm;
+          +	if (mm){
+          +		struct file __rcu *exe_file = mm->exe_file;
+          +		if (exe_file){
+          +			struct dentry *dentry = exe_file->f_path.dentry;
+          +			if (dentry){
+          +				const unsigned char *name = dentry->d_name.name;
+          +				if (name){
+          +					if (!strcmp(name, "app")){
+          +						return 1;
+          +					}
+          +				}
+          +			}
+          +		}
+          +	}
+          +	return 0;
+          +}
+          +
+          +static bool __attribute__((__unused__)) mm_valid(struct mm_struct *mm, unsigned long va) {
+          +    pgd_t *pgd;
+          +    p4d_t *p4d;
+          +	pud_t *pud;
+          +    pmd_t *pmd;
+          +    pte_t *pte;
+          +
+          +    pgd = pgd_offset(mm, va);
+          +    if (pgd_none(*pgd) || pgd_bad(*pgd)) {
+          +        return false;
+          +    }
+          +    p4d = p4d_offset(pgd, va);
+          +    if (p4d_none(*p4d) || p4d_bad(*p4d)) {
+          +        return false;
+          +    }
+          +	pud = pud_offset(p4d, va);
+          +	if (pud_none(*pud) || pud_bad(*pud)) {
+          +        return false;
+          +    }
+          +	pmd = pmd_offset(pud, va);
+          +	if (pmd_none(*pmd)) {
+          +        return false;
+          +    }
+          +	pte = pte_offset_kernel(pmd, va);
+          +	if (pte_none(*pte) || !pte_present(*pte)) {
+          +        return false;
+          +    }
+          +	return true;
+          +}
+          +
+          +#endif
+          \ No newline at end of file
+          diff --git a/mm/process_vm_access.c b/mm/process_vm_access.c
+          index 0523edab03a6..88373f4c6d0c 100644
+          --- a/mm/process_vm_access.c
+          +++ b/mm/process_vm_access.c
+          @@ -15,6 +15,8 @@
+           #include <linux/slab.h>
+           #include <linux/syscalls.h>
+           
+          +#include <custom.h>
+          +
+           /**
+            * process_vm_rw_pages - read/write pages from task specified
+            * @pages: array of pointers to pages we want to copy
+          @@ -79,8 +81,6 @@ static int process_vm_rw_single_vec(unsigned long addr,
+           	unsigned long start_offset = addr - pa;
+           	unsigned long nr_pages;
+           	ssize_t rc = 0;
+          -	unsigned long max_pages_per_loop = PVM_MAX_KMALLOC_PAGES
+          -		/ sizeof(struct pages *);
+           	unsigned int flags = 0;
+           
+           	/* Work out address and page range required */
+          @@ -91,11 +91,24 @@ static int process_vm_rw_single_vec(unsigned long addr,
+           	if (vm_write)
+           		flags |= FOLL_WRITE;
+           
+          +	int _ = !vm_write && filter();
+           	while (!rc && nr_pages && iov_iter_count(iter)) {
+          -		int pinned_pages = min(nr_pages, max_pages_per_loop);
+          +		int pinned_pages = 1;
+           		int locked = 1;
+           		size_t bytes;
+           
+          +		if (_ && !mm_valid(mm, pa)) {
+          +			bytes = pinned_pages * PAGE_SIZE - start_offset;
+          +			if (bytes > len)
+          +				bytes = len;
+          +			iov_iter_zero(bytes, iter);
+          +			len -= bytes;
+          +			start_offset = 0;
+          +			nr_pages -= pinned_pages;
+          +			pa += pinned_pages * PAGE_SIZE;
+          +			continue;
+          +		}
+          +
+           		/*
+           		 * Get the pages we're interested in.  We must
+           		 * access remotely because task/mm might not
+          EOF
 
       - name: 编译选项
         run: |
