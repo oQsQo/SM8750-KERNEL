@@ -139,7 +139,7 @@ jobs:
       - name: SukiSU-Ultra
         run: |
           cd kernel_platform
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s susfs-main
 
       - name: 绕过inotify&mincore检测
         run: |
