@@ -139,7 +139,7 @@ jobs:
       - name: SukiSU-Ultra
         run: |
           cd kernel_platform
-          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/susfs-1.5.8/kernel/setup.sh" | bash -s susfs-1.5.8
+          curl -LSs "https://raw.githubusercontent.com/SukiSU-Ultra/SukiSU-Ultra/main/kernel/setup.sh" | bash -s main
 
       - name: 绕过inotify&mincore检测
         run: |
@@ -289,7 +289,7 @@ jobs:
           echo "CONFIG_KSU_MANUAL_HOOK=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_SU=n" >> arch/arm64/configs/gki_defconfig
-          echo "CONFIG_KSU_SUSFS_SUS_PATH=n" >> arch/arm64/configs/gki_defconfig
+          echo "CONFIG_KSU_SUSFS_SUS_PATH=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_SUS_MOUNT=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_HAS_MAGIC_MOUNT=y" >> arch/arm64/configs/gki_defconfig
           echo "CONFIG_KSU_SUSFS_AUTO_ADD_SUS_KSU_DEFAULT_MOUNT=y" >> arch/arm64/configs/gki_defconfig
