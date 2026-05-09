@@ -116,8 +116,10 @@ jobs:
 
       - name: 修复SCX
         run: |
-          git clone https://github.com/HanKuCha/sched_ext.git
-          cp -r sched_ext/* kernel_platform/common/kernel/sched
+          git clone https://github.com/Numbersf/SCHED_PATCH.git -b sm8750
+          cd kernel_platform/common
+          cp ../../SCHED_PATCH/fengchi_oneplus_ace5_pro_b.patch .
+          patch -p1 -F 3 < fengchi_oneplus_ace5_pro_b.patch || true
 
       - name: KSU & SUSFS
         run: |
