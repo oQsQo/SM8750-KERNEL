@@ -4,5 +4,5 @@
   <remote name="origin" fetch="https://github.com/OnePlusOSS" />
   <project remote="origin" name="android_kernel_common_oneplus_sm8750" path="kernel_platform/common" revision="oneplus/sm8750_b_16.0.0_oneplus_ace5_pro" />
   <project remote="aosp" name="kernel/prebuilts/build-tools" path="kernel_platform/prebuilts/kernel-build-tools" revision="b46264b70e3cdf70d08c9ae2df6ea3002b242ebc" clone-depth="1" />
-  <project remote="aosp" name="platform/prebuilts/clang/host/linux-x86" path="kernel_platform/prebuilts/clang/host/linux-x86" revision="7061673283909f372f4938e45149d23bd10cbd40" clone-depth="1" />
+  <project remote="aosp" name="platform/prebuilts/clang/host/linux-x86" path="kernel_platform/prebuilts/clang/host/linux-x86" revision="62dc563017359bca29c4a08f5f27d8ecae763462" clone-depth="1" />
 </manifest>
