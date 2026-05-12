@@ -44,7 +44,4 @@
   <project remote="aosp" name="platform/system/tools/mkbootimg" path="kernel_platform/tools/mkbootimg" revision="d2bb0af5ba6d3198a3e99529c97eda1be0b5a093" clone-depth="1" groups="ddk" />
   <project remote="aosp" name="toolchain/prebuilts/ndk/r26" path="kernel_platform/prebuilts/ndk-r26" revision="abad5cbde7eb9684e37d7569810743a8a34826af" clone-depth="1" groups="ddk" />  
   <project remote="aosp" name="platform/prebuilts/clang/host/linux-x86" path="kernel_platform/prebuilts/clang/host/linux-x86" revision="7061673283909f372f4938e45149d23bd10cbd40" clone-depth="1" groups="ddk" />
-  <project remote="aosp" name="platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8" path="kernel_platform/prebuilts/gcc/linux-x86/host/x86_64-linux-glibc2.17-4.8" revision="739d8a41b6096d384338a62995a04739aff8693d" clone-depth="1" groups="ddk">
-    <linkfile dest="kernel_platform/build/build-tools/sysroot" src="sysroot"/>
-  </project>
 </manifest>
