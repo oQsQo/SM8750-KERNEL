@@ -315,5 +315,5 @@ jobs:
       - name: 输出文件
         uses: actions/upload-artifact@v4
         with:
-          name: Image
+          name: kernel
           path: kernel_platform/common/o/arch/arm64/boot/Image
