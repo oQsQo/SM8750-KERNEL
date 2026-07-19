@@ -5,11 +5,11 @@ on:
       KERNEL_NAME:
         description: '内核名称'
         required: true
-        default: '6.6.89-android15-8-g7e1f3c083cc6-abogki467167594-4k'
+        default: '6.6.118-android15-8-g93e223c276e7-abogki500782043-4k'
       KERNEL_TIME:
         description: "构建日期"
         required: true
-        default: 'Mon Dec  8 04:00:43 UTC 2025'
+        default: 'Wed Apr  8 15:08:30 UTC 2026'
 
 jobs:
   build:
