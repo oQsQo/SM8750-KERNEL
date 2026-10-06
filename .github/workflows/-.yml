@@ -117,7 +117,7 @@ jobs:
           git clone https://github.com/Numbersf/SCHED_PATCH.git -b sm8750
           cd kernel_platform/common
           cp ../../SCHED_PATCH/fengchi_oneplus_ace5_pro_b.patch .
-          patch -p1 -F 3 < fengchi_oneplus_ace5_pro_b.patch || true
+          patch -p1 -F 3 < fengchi_oneplus_ace5_pro_b.patch
 
       - name: SUSFS
         run: |
@@ -127,14 +127,11 @@ jobs:
           cp ../../susfs4ksu/kernel_patches/include/linux/* include/linux/
           cp ../../susfs4ksu/kernel_patches/50_add_susfs_in_gki-android15-6.6.patch .
           patch -p1 -F 3 < 50_add_susfs_in_gki-android15-6.6.patch
-          echo "=== REJECTED HUNKS ==="
-          find . -name '*.rej' -exec echo "--- {} ---" \; -exec cat {} \;
-          echo "=== END ==="
 
       - name: BakaSU
         run: |
           cd kernel_platform/common
-          curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/refs/heads/main/kernel/setup.sh" | bash
+          curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/refs/heads/main/kernel/setup.sh" | bash -s v4.2.0-rc3
 
       - name: 绕过inotify&mincore检测
         run: |
